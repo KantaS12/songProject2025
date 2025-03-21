@@ -2,95 +2,63 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics.pairwise import cosine_similarity
-import spotipy
-from spotipy.oauth2 import SpotifyClientCredentials
 from dotenv import load_dotenv
+import requests
 import os
+import lyricsgenius as genius
+import tkinter as tk
+from tkinter import messagebox
 load_dotenv()
 
-SPOTIPY_CLIENT_ID = os.getenv('SPOTIFY_CLIENT_ID')
-SPOTIPY_CLIENT_SECRET = os.getenv('SPOTIFY_CLIENT_SECRET')
+client_id = os.getenv("GENIUS_CLIENT_ID")
+client_secret = os.getenv("GENIUS_CLIENT_SECRET")
 
-# Authenticate with Spotify
-sp = spotipy.Spotify(auth_manager=SpotifyClientCredentials(client_id=SPOTIPY_CLIENT_ID,
-                                                           client_secret=SPOTIPY_CLIENT_SECRET))
+token_url = "https://api.genius.com/oauth/token"
+payload = {
+    'client_id': client_id,
+    'client_secret': client_secret,
+    'grant_type': 'client_credentials'
+}
 
-# Step 2: Fetch song features from Spotify
-def get_song_features(track_id):
-    """
-    Fetch audio features for a given track ID from Spotify.
-    """
-    features = sp.audio_features([track_id])[0]
-    return {
-        'danceability': features['danceability'],
-        'energy': features['energy'],
-        'key': features['key'],
-        'loudness': features['loudness'],
-        'mode': features['mode'],
-        'speechiness': features['speechiness'],
-        'acousticness': features['acousticness'],
-        'instrumentalness': features['instrumentalness'],
-        'liveness': features['liveness'],
-        'valence': features['valence'],
-        'tempo': features['tempo']
+response = requests.post(token_url, data=payload)
+if response.status_code == 200:
+    token_data = response.json()
+    access_token = token_data.get('access_token')
+    print("Access token retrieved successfully.")
+else:
+    print(f"Failed to retrieve token: {response.status_code} - {response.text}")
+    exit(1)
+
+
+def fetch_song():
+    song_name = entry.get()
+
+    search_url = "https://api.genius.com/search"
+
+    params = {
+        'q': song_name
     }
 
-# Step 3: Normalize the features
-def normalize_features(features_df):
-    """
-    Normalize the song features using MinMaxScaler.
-    """
-    scaler = MinMaxScaler()
-    normalized_features = scaler.fit_transform(features_df)
-    return pd.DataFrame(normalized_features, columns=features_df.columns)
+    headers = {
+        'Authorization': f'Bearer {access_token}'
+    }
 
-# Step 4: Find similar songs
-def find_similar_songs(input_track_id, all_tracks_features, top_n=5):
-    """
-    Find the most similar songs based on cosine similarity.
-    """
-    # Get features of the input track
-    input_features = pd.DataFrame([get_song_features(input_track_id)])
-    
-    # Normalize all features including the input track
-    all_features_normalized = normalize_features(pd.concat([all_tracks_features, input_features]))
-    
-    # Separate the input track features
-    input_track_normalized = all_features_normalized.iloc[-1].values.reshape(1, -1)
-    all_features_normalized = all_features_normalized.iloc[:-1]
-    
-    # Compute cosine similarity
-    similarities = cosine_similarity(input_track_normalized, all_features_normalized)
-    
-    # Get top N similar tracks
-    similar_indices = np.argsort(similarities[0])[::-1][:top_n]
-    return similar_indices
+    response = requests.get(search_url, headers=headers, params=params)
 
-# Step 5: Main function to recommend songs
-def recommend_songs(input_track_id, all_tracks_ids, top_n=5):
-    """
-    Recommend similar songs based on the input track.
-    """
-    # Fetch features for all tracks
-    all_tracks_features = []
-    for track_id in all_tracks_ids:
-        all_tracks_features.append(get_song_features(track_id))
-    
-    all_tracks_features = pd.DataFrame(all_tracks_features)
-    
-    # Find similar songs
-    similar_indices = find_similar_songs(input_track_id, all_tracks_features, top_n)
-    
-    # Return the recommended track IDs
-    recommended_track_ids = [all_tracks_ids[i] for i in similar_indices]
-    return recommended_track_ids
+    if response.status_code == 200:
+        data = response.json()
+        first_result = data['response']['hits'][0]['result']['title']
+        messagebox.showinfo("Result", f"Found Song: {first_result}")
+    else:
+        messagebox.showerror("Error", f"Request failed: {response.status_code}")
 
-# Example usage
-if __name__ == "__main__":
-    # Example track IDs (you can replace these with actual Spotify track IDs)
-    input_track_id = '6rqhFgbbKwnb9MLmUQDhG6'  # Example track ID
-    all_tracks_ids = ['6rqhFgbbKwnb9MLmUQDhG6', '7dGJo4pcD2V6oG8kP0tJRR', '51Blml2LZPmy7TTiAg47vQ']
+root = tk.Tk()
+root.title("Genius API Search")
 
-    # Get recommendations
-    recommended_tracks = recommend_songs(input_track_id, all_tracks_ids, top_n=3)
-    print("Recommended Track IDs:", recommended_tracks)
+entry = tk.Entry(root, width=50)
+entry.pack(pady=10)
+
+button = tk.Button(root, text="Search Song", command=fetch_song)
+button.pack(pady=10)
+
+root.mainloop()
