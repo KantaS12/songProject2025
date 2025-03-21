@@ -1,9 +1,11 @@
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
+from dotenv import load_dotenv
+import os
 
 # Replace these with your actual Spotify credentials
-SPOTIPY_CLIENT_ID = 'ccb9a0a8f693413e8fc92d12b3ce7b0d'
-SPOTIPY_CLIENT_SECRET = 'ac0943264e04454eb09287b31ffb2e37'
+SPOTIPY_CLIENT_ID = os.getenv('CLIENT_ID')
+SPOTIPY_CLIENT_SECRET = os.getenv('CLIENT_SECRET')
 
 try:
     # Authenticate with Spotify
