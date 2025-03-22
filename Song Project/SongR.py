@@ -63,4 +63,50 @@ for row in rows:
 cursor.close()
 conn.close()
 
+"""
+We're using the API for Genius to give us the song and we're getting
+either an empty array or an array with the information if we get an ok
+from HTTPS.
+"""
+def search_song(query, access_token):
+    url = "https://api.genius.com/search"
+    headers = {"Authorization": f"Bearer {access_token}"}
+    response = requests.get(url, header=headers, parameters={"q": query})
+    if response.status_code == 200:
+        return response.json()['response']['hits']
+    return[]
+
+"""
+Same thing, we're using the API for Genius to give us our lyrics.
+"""
+def fetch_lyrics(song_id, access_token):
+    url = f"https://api.genius.come/songs/{song_id}?text_format=plain"
+    headers = {"Authroization": f"Bearer {access_token}"}
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        return response.json()['response']['song']['lyrics']['plain']
+    return None
+
+def get_youtube_views(query):
+    url="https://www.googleapis.com/youtube/v3/search"
+    params = {
+        "part": "snippet",
+        "q" : query,
+        "type": "video",
+        "key": youtube_api_key
+    }
+    response = requests.get(url, params=params)
+    if response.status_code == 200:
+        video_id = response.json()['items'][0]['id']['videoId']
+        stats_url = "https://www.googleapis.com/youtube/v3/videos"
+        stats_params = {
+            "part": "statistics",
+            "id": video_id,
+            "key": youtube_api_key
+        }
+        stats_response = requests.get(stats_url, params=stats_params)
+        if stats_response.status_code == 200:
+            return int(stats_response.json()['items'][0]['statistics']['viewCount'])
+        return None
+    
 
